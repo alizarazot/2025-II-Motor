@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Motor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #f5f5f5;
+            color: #333;
+            overflow: hidden;
+        }
+        .container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            background-color: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 15px;
+            overflow: hidden;
+            height: 100%;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+            font-size: clamp(1.5rem, 4vw, 2.2rem);
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            flex-shrink: 0;
+            gap: 10px;
+        }
+        .auto-update-status {
+            display: flex;
+            align-items: center;
+            flex: 1;
+            min-width: 120px;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+        .status-active {
+            background-color: #28a745;
+        }
+        .status-inactive {
+            background-color: #dc3545;
+        }
+        .controls-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-end;
+            flex: 2;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+            white-space: nowrap;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button.secondary {
+            background-color: #6c757d;
+        }
+        button.secondary:hover {
+            background-color: #545b62;
+        }
+        button.danger {
+            background-color: #dc3545;
+        }
+        button.danger:hover {
+            background-color: #c82333;
+        }
+        
+        /* Switch para mostrar un solo campo de información */
+        .info-switch-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+        .info-switch {
+            display: flex;
+            background-color: #f8f9fa;
+            border-radius: 50px;
+            padding: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .info-switch button {
+            background: transparent;
+            color: #6c757d;
+            border-radius: 50px;
+            padding: 8px 16px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .info-switch button.active {
+            background-color: #007bff;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Contenedor de información única */
+        .single-info-container {
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+        .info-card {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            background-color: #f8f9fa;
+        }
+        .info-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            color: #495057;
+        }
+        .info-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #212529;
+        }
+        .info-unit {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-left: 5px;
+        }
+        
+        /* Tarjetas de estado (para pantallas más grandes) */
+        .status-container {
+            display: none;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+            gap: 10px;
+        }
+        .status-card {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .status-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+        .status-value {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .status-off {
+            background-color: #e0e0e0;
+            color: #666;
+        }
+        .status-running {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-malfunctioning {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .chart-container {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+        .last-update {
+            text-align: right;
+            font-style: italic;
+            color: #666;
+            margin-top: 10px;
+            flex-shrink: 0;
+            font-size: 0.9em;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 95vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .modal-header h2 {
+            color: #2c3e50;
+            font-size: 1.4rem;
+        }
+        .close-modal {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #6c757d;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .close-modal:hover {
+            color: #343a40;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        .data-table th, .data-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: center;
+        }
+        .data-table th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 15px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        /* Menu para pantallas pequeñas */
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #007bff;
+            padding: 5px;
+        }
+        
+        /* Media Queries para diferentes tamaños de pantalla */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            .controls {
+                flex-direction: row;
+                align-items: center;
+            }
+            .auto-update-status {
+                min-width: auto;
+                margin-bottom: 0;
+                justify-content: flex-start;
+                flex: 0 1 auto;
+            }
+            .controls-buttons {
+                justify-content: flex-end;
+            }
+            button {
+                padding: 8px 10px;
+                font-size: 13px;
+            }
+            .modal-content {
+                padding: 10px;
+            }
+            .modal-header h2 {
+                font-size: 1.2rem;
+            }
+            .data-table {
+                font-size: 0.8em;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .info-switch {
+                width: 100%;
+                justify-content: center;
+            }
+            .info-switch button {
+                flex: 1;
+                text-align: center;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 8px;
+            }
+            h1 {
+                margin-bottom: 10px;
+            }
+            .controls {
+                padding: 8px;
+                position: relative;
+            }
+            .menu-toggle {
+                display: block;
+                order: 2;
+            }
+            .controls-buttons {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background-color: white;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 10px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                z-index: 100;
+                flex-direction: column;
+                margin-top: 5px;
+            }
+            .controls-buttons.show {
+                display: flex;
+            }
+            .controls-buttons button {
+                width: 100%;
+                margin: 2px 0;
+                text-align: left;
+            }
+            .auto-update-status {
+                flex: 1;
+                min-width: auto;
+            }
+            .modal-content {
+                padding: 8px;
+            }
+            .modal-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .modal-header h2 {
+                margin-bottom: 10px;
+            }
+            .modal-actions {
+                flex-direction: column;
+            }
+            .modal-actions button {
+                width: 100%;
+            }
+        }
+        
+        @media (min-width: 769px) {
+            .info-switch-container, .single-info-container {
+                display: none;
+            }
+            .status-container {
+                display: flex;
+            }
+        }
+        
+        @media (max-width: 360px) {
+            .auto-update-status span {
+                font-size: 0.85em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Monitor de Motor</h1>
+        
+        <div class="controls">
+            <div class="auto-update-status">
+                <div class="status-indicator status-active" id="auto-update-indicator"></div>
+                <span>Auto: 1s</span>
+            </div>
+            <button class="menu-toggle" id="menu-toggle">☰</button>
+            <div class="controls-buttons" id="controls-buttons">
+                <button id="toggle-auto-update">Desactivar Auto</button>
+                <button id="manual-update">Actualizar</button>
+                <button id="show-history" class="secondary">Historial</button>
+                <button id="clear-history" class="danger">Vaciar</button>
+            </div>
+        </div>
+        
+        <!-- Switch para mostrar un solo campo de información en móviles -->
+        <div class="info-switch-container">
+            <div class="info-switch">
+                <button class="active" data-info="amperage">Amperaje</button>
+                <button data-info="vibration">Vibración</button>
+                <button data-info="status">Estado</button>
+            </div>
+        </div>
+        
+        <!-- Contenedor para mostrar un solo campo de información -->
+        <div class="single-info-container">
+            <div class="info-card" id="amperage-info">
+                <div class="info-title">Amperaje</div>
+                <div class="info-value">-- <span class="info-unit">A</span></div>
+            </div>
+            <div class="info-card" id="vibration-info" style="display: none;">
+                <div class="info-title">Vibración</div>
+                <div class="info-value">--</div>
+            </div>
+            <div class="info-card" id="status-info" style="display: none;">
+                <div class="info-title">Estado del Motor</div>
+                <div class="info-value">--</div>
+            </div>
+        </div>
+        
+        <!-- Tarjetas de estado para pantallas más grandes -->
+        <div class="status-container">
+            <div class="status-card" id="amperage-status">
+                <div class="status-title">Amperaje</div>
+                <div class="status-value" id="amperage-value">-- A</div>
+            </div>
+            <div class="status-card" id="vibration-status">
+                <div class="status-title">Vibración</div>
+                <div class="status-value" id="vibration-value">--</div>
+            </div>
+            <div class="status-card" id="motor-status">
+                <div class="status-title">Estado Motor</div>
+                <div class="status-value" id="motor-status-value">--</div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="amperageChart"></canvas>
+        </div>
+        
+        <div class="last-update" id="last-update">
+            Última actualización: --
+        </div>
+    </div>
+
+    <!-- Modal para el historial -->
+    <div class="modal" id="history-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Historial Detallado</h2>
+                <button class="close-modal" id="close-modal">&times;</button>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Tiempo</th>
+                        <th>Amperaje (A)</th>
+                        <th>Vibración</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="data-table-body">
+                    <!-- Los datos se llenarán dinámicamente -->
+                </tbody>
+            </table>
+            <div class="modal-actions">
+                <button id="clear-history-modal" class="danger">Vaciar Historial</button>
+                <button id="close-modal-btn" class="secondary">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración inicial de la gráfica
+        let amperageChart;
+        let timeLabels = [];
+        let amperageData = [];
+        
+        // Variables para control de actualización
+        let autoUpdateInterval;
+        let isAutoUpdateActive = true;
+        const UPDATE_INTERVAL = 1000; // 1 segundo
+        
+        // Clave para localStorage
+        const STORAGE_KEY = 'motorMonitoringData';
+        
+        // Cargar datos del localStorage
+        function loadDataFromStorage() {
+            const storedData = localStorage.getItem(STORAGE_KEY);
+            if (storedData) {
+                const parsedData = JSON.parse(storedData);
+                timeLabels = parsedData.timeLabels || [];
+                amperageData = parsedData.amperageData || [];
+            }
+        }
+        
+        // Guardar datos en localStorage
+        function saveDataToStorage() {
+            const dataToStore = {
+                timeLabels: timeLabels,
+                amperageData: amperageData
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
+        }
+        
+        // Vaciar historial
+        function clearHistory() {
+            if (confirm("¿Está seguro de que desea vaciar todo el historial? Esta acción no se puede deshacer.")) {
+                timeLabels = [];
+                amperageData = [];
+                saveDataToStorage();
+                updateChart();
+                updateHistoryTable();
+            }
+        }
+        
+        // Inicializar la gráfica
+        function initializeChart() {
+            const ctx = document.getElementById('amperageChart').getContext('2d');
+            amperageChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [
+                        {
+                            label: 'Amperaje (A)',
+                            data: amperageData,
+                            borderColor: 'rgb(255, 99, 132)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            tension: 0.4,
+                            fill: true,
+                            pointRadius: 2,
+                            pointHoverRadius: 5,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Tiempo'
+                            },
+                            ticks: {
+                                maxTicksLimit: 8,
+                                callback: function(value, index, values) {
+                                    // Mostrar solo algunas etiquetas para evitar saturación
+                                    if (index % Math.ceil(timeLabels.length / 8) === 0 || index === timeLabels.length - 1) {
+                                        return timeLabels[index];
+                                    }
+                                    return '';
+                                }
+                            }
+                        },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Amperaje (A)'
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 10
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Amperaje del Motor en Tiempo Real'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Actualizar la gráfica
+        function updateChart() {
+            amperageChart.data.labels = timeLabels;
+            amperageChart.data.datasets[0].data = amperageData;
+            amperageChart.update('none');
+        }
+        
+        // Función para obtener datos del endpoint simulado /data
+        async function fetchData() {
+            try {
+                // En un caso real, aquí haríamos fetch('/data')
+                // Pero para este ejemplo, simulamos la respuesta
+                const response = await simulateDataFetch();
+                return response;
+            } catch (error) {
+                console.error('Error al obtener datos:', error);
+                return null;
+            }
+        }
+        
+        // Simulador de datos del motor
+        function simulateDataFetch() {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    // Generar datos aleatorios para simular
+                    const amperage = Math.random() * 8 + 1; // Amperaje entre 1A y 9A
+                    const vibration = Math.random() > 0.7; // 30% de probabilidad de vibración
+                    
+                    // Determinar estado basado en amperaje y vibración
+                    let status;
+                    if (amperage < 1.5) {
+                        status = 'off';
+                    } else if (amperage > 8 || vibration) {
+                        status = 'malfunctioning';
+                    } else {
+                        status = 'running';
+                    }
+                    
+                    const currentTime = new Date().toLocaleTimeString();
+                    
+                    resolve({
+                        amperage: amperage.toFixed(2),
+                        vibration: vibration,
+                        status: status,
+                        timestamp: currentTime
+                    });
+                }, 300); // Simular latencia de red reducida
+            });
+        }
+        
+        // Actualizar la interfaz con los nuevos datos
+        function updateUI(data) {
+            // Actualizar valores de estado para pantallas grandes
+            document.getElementById('amperage-value').textContent = `${data.amperage} A`;
+            document.getElementById('vibration-value').textContent = data.vibration ? 'SÍ' : 'NO';
+            document.getElementById('motor-status-value').textContent = 
+                data.status === 'off' ? 'APAGADO' : 
+                data.status === 'running' ? 'FUNCIONANDO' : 'MAL FUNCIONAMIENTO';
+            
+            // Actualizar valores para pantallas pequeñas (solo el activo)
+            document.getElementById('amperage-info').querySelector('.info-value').innerHTML = `${data.amperage} <span class="info-unit">A</span>`;
+            document.getElementById('vibration-info').querySelector('.info-value').textContent = data.vibration ? 'SÍ' : 'NO';
+            document.getElementById('status-info').querySelector('.info-value').textContent = 
+                data.status === 'off' ? 'APAGADO' : 
+                data.status === 'running' ? 'FUNCIONANDO' : 'MAL FUNCIONAMIENTO';
+            
+            // Actualizar colores de estado
+            const motorStatusCard = document.getElementById('motor-status');
+            motorStatusCard.className = 'status-card';
+            motorStatusCard.classList.add(`status-${data.status}`);
+            
+            // Actualizar gráfica
+            const currentTime = new Date().toLocaleTimeString();
+            
+            // Agregar nuevos datos (sin límite)
+            timeLabels.push(currentTime);
+            amperageData.push(parseFloat(data.amperage));
+            
+            // Actualizar gráfica
+            updateChart();
+            
+            // Actualizar tabla en el modal
+            updateHistoryTable(data, currentTime);
+            
+            // Guardar datos en localStorage
+            saveDataToStorage();
+            
+            // Actualizar última actualización
+            document.getElementById('last-update').textContent = 
+                `Última actualización: ${currentTime}`;
+        }
+        
+        // Actualizar la tabla de historial
+        function updateHistoryTable(data = null, currentTime = null) {
+            const tableBody = document.getElementById('data-table-body');
+            
+            // Si se proporcionan datos nuevos, agregarlos
+            if (data && currentTime) {
+                const newRow = document.createElement('tr');
+                
+                newRow.innerHTML = `
+                    <td>${currentTime}</td>
+                    <td>${data.amperage} A</td>
+                    <td>${data.vibration ? 'SÍ' : 'NO'}</td>
+                    <td>${data.status === 'off' ? 'APAGADO' : 
+                          data.status === 'running' ? 'FUNCIONANDO' : 'MAL FUNCIONAMIENTO'}</td>
+                `;
+                
+                tableBody.insertBefore(newRow, tableBody.firstChild);
+            } else {
+                // Si no hay datos nuevos, reconstruir la tabla completa desde el historial
+                tableBody.innerHTML = '';
+                
+                // Reconstruir la tabla desde el final hacia el principio para mantener el orden cronológico
+                for (let i = 0; i < timeLabels.length; i++) {
+                    const row = document.createElement('tr');
+                    
+                    // Para este ejemplo, no tenemos todos los datos históricos almacenados
+                    // En una implementación real, almacenaríamos todos los datos
+                    row.innerHTML = `
+                        <td>${timeLabels[i]}</td>
+                        <td>${amperageData[i].toFixed(2)} A</td>
+                        <td>--</td>
+                        <td>--</td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                }
+            }
+        }
+        
+        // Cambiar la información mostrada en pantallas pequeñas
+        function switchInfo(infoType) {
+            // Ocultar todas las tarjetas de información
+            document.querySelectorAll('.info-card').forEach(card => {
+                card.style.display = 'none';
+            });
+            
+            // Mostrar solo la tarjeta seleccionada
+            document.getElementById(`${infoType}-info`).style.display = 'block';
+            
+            // Actualizar botones activos
+            document.querySelectorAll('.info-switch button').forEach(button => {
+                button.classList.remove('active');
+            });
+            document.querySelector(`.info-switch button[data-info="${infoType}"]`).classList.add('active');
+        }
+        
+        // Función principal para actualizar datos
+        async function updateData() {
+            const data = await fetchData();
+            if (data) {
+                updateUI(data);
+            }
+        }
+        
+        // Iniciar actualización automática
+        function startAutoUpdate() {
+            if (!autoUpdateInterval) {
+                autoUpdateInterval = setInterval(updateData, UPDATE_INTERVAL);
+                isAutoUpdateActive = true;
+                updateAutoUpdateIndicator();
+            }
+        }
+        
+        // Detener actualización automática
+        function stopAutoUpdate() {
+            if (autoUpdateInterval) {
+                clearInterval(autoUpdateInterval);
+                autoUpdateInterval = null;
+                isAutoUpdateActive = false;
+                updateAutoUpdateIndicator();
+            }
+        }
+        
+        // Alternar estado de actualización automática
+        function toggleAutoUpdate() {
+            if (isAutoUpdateActive) {
+                stopAutoUpdate();
+                document.getElementById('toggle-auto-update').textContent = 'Activar Auto';
+            } else {
+                startAutoUpdate();
+                document.getElementById('toggle-auto-update').textContent = 'Desactivar Auto';
+            }
+        }
+        
+        // Actualizar el indicador de estado de actualización automática
+        function updateAutoUpdateIndicator() {
+            const indicator = document.getElementById('auto-update-indicator');
+            if (isAutoUpdateActive) {
+                indicator.className = 'status-indicator status-active';
+            } else {
+                indicator.className = 'status-indicator status-inactive';
+            }
+        }
+        
+        // Mostrar modal de historial
+        function showHistoryModal() {
+            document.getElementById('history-modal').style.display = 'flex';
+        }
+        
+        // Ocultar modal de historial
+        function hideHistoryModal() {
+            document.getElementById('history-modal').style.display = 'none';
+        }
+        
+        // Alternar menú en pantallas pequeñas
+        function toggleMenu() {
+            const menu = document.getElementById('controls-buttons');
+            menu.classList.toggle('show');
+        }
+        
+        // Cerrar menú al hacer clic fuera de él
+        function setupMenuClose() {
+            document.addEventListener('click', function(event) {
+                const menu = document.getElementById('controls-buttons');
+                const toggle = document.getElementById('menu-toggle');
+                
+                if (!menu.contains(event.target) && !toggle.contains(event.target) && menu.classList.contains('show')) {
+                    menu.classList.remove('show');
+                }
+            });
+        }
+        
+        // Inicializar la aplicación
+        document.addEventListener('DOMContentLoaded', () => {
+            // Cargar datos del almacenamiento
+            loadDataFromStorage();
+            
+            // Inicializar gráfica
+            initializeChart();
+            
+            // Configurar event listeners para los botones
+            document.getElementById('manual-update').addEventListener('click', updateData);
+            document.getElementById('toggle-auto-update').addEventListener('click', toggleAutoUpdate);
+            document.getElementById('show-history').addEventListener('click', showHistoryModal);
+            document.getElementById('clear-history').addEventListener('click', clearHistory);
+            document.getElementById('clear-history-modal').addEventListener('click', clearHistory);
+            
+            // Event listeners para el modal
+            document.getElementById('close-modal').addEventListener('click', hideHistoryModal);
+            document.getElementById('close-modal-btn').addEventListener('click', hideHistoryModal);
+            
+            // Event listener para el menú toggle
+            document.getElementById('menu-toggle').addEventListener('click', toggleMenu);
+            
+            // Event listeners para el switch de información
+            document.querySelectorAll('.info-switch button').forEach(button => {
+                button.addEventListener('click', function() {
+                    switchInfo(this.getAttribute('data-info'));
+                });
+            });
+            
+            // Configurar cierre del menú
+            setupMenuClose();
+            
+            // Cerrar modal al hacer clic fuera del contenido
+            document.getElementById('history-modal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    hideHistoryModal();
+                }
+            });
+            
+            // Obtener datos iniciales
+            updateData();
+            
+            // Iniciar actualización automática
+            startAutoUpdate();
+            
+            // Manejar el redimensionamiento de la ventana
+            window.addEventListener('resize', function() {
+                amperageChart.resize();
+            });
+        });
+    </script>
+</body>
+</html>
