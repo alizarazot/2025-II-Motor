@@ -45,7 +45,7 @@ void loop() {
     Serial.println(motion_avg);
 
     Serial.print(motion_hasMotion(scan_value) ? "Y" : "N");
-    Serial.print(", ");
+    Serial.print(" ");
     Serial.println(current_value());
   }
 

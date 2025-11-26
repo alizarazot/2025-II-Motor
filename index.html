@@ -430,7 +430,7 @@
         <div class="controls">
             <div class="auto-update-status">
                 <div class="status-indicator status-active" id="auto-update-indicator"></div>
-                <span>Auto: 1s</span>
+                <span>Auto: 500ms</span>
             </div>
             <button class="menu-toggle" id="menu-toggle">☰</button>
             <div class="controls-buttons" id="controls-buttons">
@@ -527,7 +527,7 @@
         // Variables para control de actualización
         let autoUpdateInterval;
         let isAutoUpdateActive = true;
-        const UPDATE_INTERVAL = 1000; // 1 segundo
+        const UPDATE_INTERVAL = 500; // 1 segundo
         
         // Clave para localStorage
         const STORAGE_KEY = 'motorMonitoringData';
@@ -612,7 +612,7 @@
                                 text: 'Amperaje (A)'
                             },
                             suggestedMin: 0,
-                            suggestedMax: 10
+                            suggestedMax: 1,
                         }
                     },
                     plugins: {
@@ -640,8 +640,9 @@
             try {
                 // En un caso real, aquí haríamos fetch('/data')
                 // Pero para este ejemplo, simulamos la respuesta
-                const response = await simulateDataFetch();
-                return response;
+                const response = await fetch('/data');
+                const json = await response.json();
+                return json;
             } catch (error) {
                 console.error('Error al obtener datos:', error);
                 return null;
@@ -649,34 +650,6 @@
         }
         
         // Simulador de datos del motor
-        function simulateDataFetch() {
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    // Generar datos aleatorios para simular
-                    const amperage = Math.random() * 8 + 1; // Amperaje entre 1A y 9A
-                    const vibration = Math.random() > 0.7; // 30% de probabilidad de vibración
-                    
-                    // Determinar estado basado en amperaje y vibración
-                    let status;
-                    if (amperage < 1.5) {
-                        status = 'off';
-                    } else if (amperage > 8 || vibration) {
-                        status = 'malfunctioning';
-                    } else {
-                        status = 'running';
-                    }
-                    
-                    const currentTime = new Date().toLocaleTimeString();
-                    
-                    resolve({
-                        amperage: amperage.toFixed(2),
-                        vibration: vibration,
-                        status: status,
-                        timestamp: currentTime
-                    });
-                }, 300); // Simular latencia de red reducida
-            });
-        }
         
         // Actualizar la interfaz con los nuevos datos
         function updateUI(data) {
