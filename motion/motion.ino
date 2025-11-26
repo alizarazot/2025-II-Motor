@@ -34,16 +34,22 @@ void setup() {
 
 void loop() {
   double scan_value;
-  if (millis() % 50 == 0) {
+  if (millis() % 100 == 0) {
     scan_value = motion_scan();
   }
 
-  if (millis() % 500 == 0) {
-    Serial.println(motion_hasMotion(scan_value) ? "Motion!" : "Quiet");
+  if (millis() % 300 == 0) {
+    Serial.print("# Val: ");
+    Serial.print(scan_value);
+    Serial.print(", Avg: ");
+    Serial.println(motion_avg);
+
+    Serial.print(motion_hasMotion(scan_value) ? "Y" : "N");
+    Serial.print(", ");
     Serial.println(current_value());
   }
 
-  if (millis() % 5000 == 0) {
+  if (millis() % 10000 == 0) {
     motion_avg = 0;
     motion_navg = 0;
   }
